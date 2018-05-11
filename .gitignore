@@ -1,0 +1,5 @@
+.cquery_cached_index/
+badgerdb_main
+compile_commands.json
+src/lib/
+src/obj/

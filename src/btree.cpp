@@ -25,11 +25,10 @@ namespace badgerdb
 // -----------------------------------------------------------------------------
 
 BTreeIndex::BTreeIndex(const std::string & relationName,
-		std::string & outIndexName,
-		BufMgr *bufMgrIn,
-		const int attrByteOffset,
-		const Datatype attrType) {
-	
+                std::string & outIndexName,
+                BufMgr *bufMgrIn,
+                const int attrByteOffset,
+                const Datatype attrType) {
 }
 
 
@@ -39,8 +38,7 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 
 BTreeIndex::~BTreeIndex() {
 
-	/* YOUR CODE HERE */
-	
+        /* YOUR CODE HERE */
 }
 
 
@@ -53,7 +51,7 @@ BTreeIndex::~BTreeIndex() {
 
 const void BTreeIndex::insertEntry(const void *key, const RecordId rid)  {
 
-		/* YOUR CODE HERE */
+                /* YOUR CODE HERE */
 
 }
 
@@ -66,10 +64,10 @@ const void BTreeIndex::insertEntry(const void *key, const RecordId rid)  {
 // -----------------------------------------------------------------------------
 
 const void BTreeIndex::startScan(const void* lowValParm,
-				   const Operator lowOpParm,
-				   const void* highValParm,
-				   const Operator highOpParm) {
-	/* YOUR CODE HERE */
+                                   const Operator lowOpParm,
+                                   const void* highValParm,
+                                   const Operator highOpParm) {
+        /* YOUR CODE HERE */
 
 }
 
@@ -79,8 +77,8 @@ const void BTreeIndex::startScan(const void* lowValParm,
 
 const void BTreeIndex::scanNext(RecordId& outRid) {
 
-	/* YOUR CODE HERE */
-	
+        /* YOUR CODE HERE */
+
 }
 
 
@@ -90,8 +88,8 @@ const void BTreeIndex::scanNext(RecordId& outRid) {
 //
 const void BTreeIndex::endScan() {
 
-	/* YOUR CODE HERE */
-	
+        /* YOUR CODE HERE */
+
 }
 
 }
