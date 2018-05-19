@@ -14,12 +14,14 @@
 
 #include "types.h"
 #include "page.h"
+#include "page_iterator.h"
 #include "file.h"
 #include "buffer.h"
 
+typedef std::string Str;
+
 namespace badgerdb
 {
-
   /**
    * @brief Datatype enumeration type.
    */
@@ -46,13 +48,17 @@ namespace badgerdb
    * @brief Number of key slots in B+Tree leaf for INTEGER key.
    */
   //                                                  sibling ptr             key               rid
-  const  int INTARRAYLEAFSIZE = ( Page::SIZE - sizeof( PageId ) ) / ( sizeof( int ) + sizeof( RecordId ) );
+  const  int INTARRAYLEAFSIZE = ( Page::SIZE - sizeof( PageId ) ) / ( sizeof( int ) + sizeof( RecordId ) ) - 12;
+  const  int DOUBLEARRAYLEAFSIZE = ( Page::SIZE - sizeof( PageId ) ) / ( sizeof( double ) + sizeof( RecordId ) ) - 12;
+  const  int STRINGARRAYLEAFSIZE = ( Page::SIZE - sizeof( PageId ) ) / ( 20*sizeof( char ) + sizeof( RecordId ) ) - 12;
 
   /**
    * @brief Number of key slots in B+Tree non-leaf for INTEGER key.
    */
   //                                                     level     extra pageNo                  key       pageNo
-  const  int INTARRAYNONLEAFSIZE = ( Page::SIZE - sizeof( int ) - sizeof( PageId ) ) / ( sizeof( int ) + sizeof( PageId ) );
+  const  int INTARRAYNONLEAFSIZE = (( Page::SIZE - sizeof( int ) - sizeof( PageId ) ) / ( sizeof( int ) + sizeof( PageId ) )) - 16;
+  const  int DOUBLEARRAYNONLEAFSIZE = (( Page::SIZE - sizeof( int ) - sizeof( PageId ) ) / ( sizeof( double ) + sizeof( PageId ) )) - 16;
+  const  int STRINGARRAYNONLEAFSIZE = (( Page::SIZE - sizeof( int ) - sizeof( PageId ) ) / ( 20*sizeof( char ) + sizeof( PageId ) )) - 16;
 
   /**
    * @brief Structure to store a key-rid pair. It is used to pass the pair to functions that
@@ -131,10 +137,13 @@ namespace badgerdb
   };
 
   /*
-    Each node is a page, so once we read the page in we just cast the pointer to the page to this struct and use it to access the parts
-    These structures basically are the format in which the information is stored in the pages for the index file depending on what kind of
-    node they are. The level memeber of each non leaf structure seen below is set to 1 if the nodes
-    at this level are just above the leaf nodes. Otherwise set to 0.
+    Each node is a page, so once we read the page in we just cast the pointer
+    to the page to this struct and use it to access the parts
+    These structures basically are the format in which the information is
+    stored in the pages for the index file depending on what kind of
+    node they are. The level memeber of each non leaf structure seen below is 
+    set to 1 if the nodes at this level are just above the leaf nodes.
+    Otherwise set to 0.
   */
 
   /**
@@ -155,6 +164,17 @@ namespace badgerdb
      * Stores page numbers of child pages which themselves are other non-leaf/leaf nodes in the tree.
      */
     PageId pageNoArray[ INTARRAYNONLEAFSIZE + 1 ];
+
+    NonLeafNodeInt() {
+      level = 0;
+      int i;
+      for (i=0; i<INTARRAYNONLEAFSIZE; i++) {
+        keyArray[i] = -1;
+        pageNoArray[i] = 0;
+      }
+      // and the last one
+      pageNoArray[i] = 0;
+    }
   };
 
 
@@ -177,6 +197,133 @@ namespace badgerdb
      * This linking of leaves allows to easily move from one leaf to the next leaf during index scan.
      */
     PageId rightSibPageNo;
+
+    LeafNodeInt() {
+      int i;
+      rightSibPageNo = 0;
+      for (i=0; i<INTARRAYLEAFSIZE; i++) {
+        keyArray[i] = -1;
+        ridArray[i] = RecordId();
+      }
+    }
+  };
+
+    struct NonLeafNodeDouble{
+    /**
+     * Level of the node in the tree.
+     */
+    int level;
+
+    /**
+     * Stores keys.
+     */
+    double keyArray[ DOUBLEARRAYNONLEAFSIZE ];
+
+    /**
+     * Stores page numbers of child pages which themselves are other non-leaf/leaf nodes in the tree.
+     */
+    PageId pageNoArray[ DOUBLEARRAYNONLEAFSIZE + 1 ];
+
+    NonLeafNodeDouble() {
+      level = 0;
+      int i;
+      for (i=0; i<DOUBLEARRAYNONLEAFSIZE; i++) {
+        keyArray[i] = -1;
+        pageNoArray[i] = 0;
+      }
+      // and the last one
+      pageNoArray[i] = 0;
+    }
+  };
+
+
+  /**
+   * @brief Structure for all leaf nodes when the key is of INTEGER type.
+   */
+  struct LeafNodeDouble{
+    /**
+     * Stores keys.
+     */
+    double keyArray[ DOUBLEARRAYLEAFSIZE ];
+
+    /**
+     * Stores RecordIds.
+     */
+    RecordId ridArray[ DOUBLEARRAYLEAFSIZE ];
+
+    /**
+     * Page number of the leaf on the right side.
+     * This linking of leaves allows to easily move from one leaf to the next leaf during index scan.
+     */
+    PageId rightSibPageNo;
+
+    LeafNodeDouble() {
+      int i;
+      rightSibPageNo = 0;
+      for (i=0; i<DOUBLEARRAYLEAFSIZE; i++) {
+        keyArray[i] = -1;
+        ridArray[i] = RecordId();
+      }
+    }
+  };
+
+    struct NonLeafNodeString{
+    /**
+     * Level of the node in the tree.
+     */
+    int level;
+
+    /**
+     * Stores keys.
+     */
+    char keyArray[ STRINGARRAYNONLEAFSIZE ][20];
+
+    /**
+     * Stores page numbers of child pages which themselves are other non-leaf/leaf nodes in the tree.
+     */
+    PageId pageNoArray[ STRINGARRAYNONLEAFSIZE + 1 ];
+
+    NonLeafNodeString() {
+      level = 0;
+      int i;
+      for (i=0; i<STRINGARRAYNONLEAFSIZE; i++) {
+        strcpy(keyArray[i], "");
+        pageNoArray[i] = 0;
+      }
+      // and the last one
+      pageNoArray[i] = 0;
+    }
+  };
+
+
+  /**
+   * @brief Structure for all leaf nodes when the key is of INTEGER type.
+   */
+  struct LeafNodeString{
+    /**
+     * Stores keys.
+     */
+    char keyArray[ STRINGARRAYLEAFSIZE ][20];
+
+    /**
+     * Stores RecordIds.
+     */
+    RecordId ridArray[ STRINGARRAYLEAFSIZE ];
+
+    /**
+     * Page number of the leaf on the right side.
+     * This linking of leaves allows to easily move from one leaf to the next leaf during index scan.
+     */
+    PageId rightSibPageNo;
+
+    LeafNodeString() {
+      int i;
+      rightSibPageNo = 0;
+      for (i=0; i<STRINGARRAYLEAFSIZE; i++) {
+        strcpy(keyArray[i], "");
+        ridArray[i] = RecordId();
+      }
+    }
   };
 
 
@@ -191,42 +338,42 @@ namespace badgerdb
     /**
      * File object for the index file.
      */
-    File *file;
+    File *p_file;
 
     /**
      * Buffer Manager Instance.
      */
-    BufMgr *bufMgr;
+    BufMgr *p_bufMgr;
 
     /**
      * Page number of meta page.
      */
-    PageId headerPageNum;
+    PageId m_headerPageNum;
 
     /**
      * page number of root page of B+ tree inside index file.
      */
-    PageId rootPageNum;
+    PageId m_rootPageNum;
 
     /**
      * Datatype of attribute over which index is built.
      */
-    Datatype attributeType;
+    Datatype m_attributeType;
 
     /**
      * Offset of attribute, over which index is built, inside records.
      */
-    int attrByteOffset;
+    int m_attrByteOffset;
 
     /**
      * Number of keys in leaf node, depending upon the type of key.
      */
-    int leafOccupancy;
+    int m_leafOccupancy;
 
     /**
      * Number of keys in non-leaf node, depending upon the type of key.
      */
-    int nodeOccupancy;
+    int m_nodeOccupancy;
 
 
     // MEMBERS SPECIFIC TO SCANNING
@@ -234,64 +381,101 @@ namespace badgerdb
     /**
      * True if an index scan has been started.
      */
-    bool scanExecuting;
+    bool m_scanExecuting;
 
     /**
      * Index of next entry to be scanned in current leaf being scanned.
      */
-    int nextEntry;
+    int m_nextEntry;
 
     /**
      * Page number of current page being scanned.
      */
-    PageId currentPageNum;
+    PageId m_currentPageNum;
 
     /**
      * Current Page being scanned.
      */
-    Page *currentPageData;
+    Page *p_currentPageData;
 
     /**
      * Low INTEGER value for scan.
      */
-    int lowValInt;
+    int m_lowValInt = 0;
 
     /**
      * Low DOUBLE value for scan.
      */
-    double lowValDouble;
+    double m_lowValDouble = 0.0;
 
     /**
      * Low STRING value for scan.
      */
-    std::string	lowValString;
+    Str	m_lowValString = "";
 
     /**
      * High INTEGER value for scan.
      */
-    int highValInt;
+    int m_highValInt = 0;
 
     /**
      * High DOUBLE value for scan.
      */
-    double highValDouble;
+    double m_highValDouble = 0.0;
 
     /**
      * High STRING value for scan.
      */
-    std::string highValString;
+    Str m_highValString = "";
 
     /**
      * Low Operator. Can only be GT(>) or GTE(>=).
      */
-    Operator lowOp;
+    Operator m_lowOp;
 
     /**
      * High Operator. Can only be LT(<) or LTE(<=).
      */
-    Operator highOp;
+    Operator m_highOp;
 
-    bool is_root_leaf; // if the root node is a LeafNode
+    bool m_is_root_leaf = false; // if the root node is a LeafNode
+
+    ///////////////////////
+    // Helper functions  //
+    ///////////////////////
+    bool isInitialized = false;
+
+    /// makes the index filename
+    Str makeIndexFilename(const Str &relationName,
+                          const int arrByteOffset);
+
+    /// verfies the file metadata matches the one provided
+    /// returns:
+    ///   * true if everything is fine and neat
+    ///   * false otherwise
+    bool verifyFile(const Str &relName);
+
+    /// apply index metadata to a new file
+    void injectIndexMetadata(const Str &relName);
+
+    /// get root page id
+    PageId getRootPageId();
+    void setRootPage(PageId &pId);
+
+    PageId insertNode();
+
+    template <class T>
+    void writePage(T &st, PageId pId);
+
+    const Str getPageNode(Page *page) {
+      return page->getRecord(page->begin().getCurrentRecord());
+    }
+
+    NonLeafNodeInt getNodeFromPageId(const PageId pId);
+    LeafNodeInt getLeafNodeFromPageId(const PageId pId);
+    bool search(const int key, LeafNodeInt &ret);
+    bool treeSearch(const int key, NonLeafNodeInt NLN, LeafNodeInt &ret);
+    int getKeyPosition(const int key, int *arr);
 
   public:
 
@@ -305,9 +489,13 @@ namespace badgerdb
      * @param bufMgrIn						Buffer Manager Instance
      * @param attrByteOffset			Offset of attribute, over which index is to be built, in the record
      * @param attrType						Datatype of attribute over which index is built
-     * @throws  BadIndexInfoException     If the index file already exists for the corresponding attribute, but values in metapage(relationName, attribute byte offset, attribute type etc.) do not match with values received through constructor parameters.
+     * @throws  BadIndexInfoException
+     *   If the index file already exists for the corresponding
+     *   attribute, but values in metapage
+     *   (relationName, attribute byte offset, attribute type etc.)
+     *   do not match with values received through constructor parameters.
      */
-    BTreeIndex(const std::string & relationName, std::string & outIndexName,
+    BTreeIndex(const Str & relationName, Str & outIndexName,
                BufMgr *bufMgrIn, const int attrByteOffset, const Datatype attrType);
 
     /**
